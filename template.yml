@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion : '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: infrastructurez for a twitter bot
+
+Parameters:
+  TwitterConsumerKey:
+    Type: String
+  TwitterConsumerSecret:
+    Type: String
+  TwitterAccessToken:
+    Type: String
+  TwitterAccessTokenSecret:
+    Type: String
+  LambdaFunctionName:
+    Type: String
+    Default: gitwishes-function
+
+Resources:
+
+  GitWishesLambdaBot:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - GitWishesRole
+      - GitWishesQueue
+    Properties:
+      Handler: function.handler
+      Runtime: python3.6
+      Role: !GetAtt [GitWishesRole, Arn]
+      CodeUri: ./dist
+      FunctionName: !Ref LambdaFunctionName
+      Environment:
+        Variables:
+          TWITTER_CONSUMER_KEY: !Ref TwitterConsumerKey
+          TWITTER_CONSUMER_SECRET: !Ref TwitterConsumerSecret
+          TWITTER_ACCESS_TOKEN: !Ref TwitterAccessToken
+          TWITTER_ACCESS_TOKEN_SECRET: !Ref TwitterAccessTokenSecret
+          QUEUE_NAME: !GetAtt GitWishesQueue.QueueName
+
+  GitWishesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: gitwishes-service-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Action: sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+
+  GitWishesQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      ContentBasedDeduplication: true
+      FifoQueue: true
+      MessageRetentionPeriod: 86400
+      QueueName: gitwishes-messages.fifo
+
+  CommitSearchEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      ScheduleExpression: "cron(0 0 * * ? *)"
+      Name: CommitSearchEvent
+      State: "ENABLED"
+      Targets:
+        -
+          Arn: !GetAtt GitWishesLambdaBot.Arn
+          Id: "CommitSearchEventScheduler"
+
+  PermissionForCommitSearchEventToInvokeLambda:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      FunctionName: !Ref LambdaFunctionName
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt [CommitSearchEventRule, Arn]

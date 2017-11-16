@@ -1,0 +1,4 @@
+requests
+tweepy
+awscli
+boto3
