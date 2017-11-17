@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion : '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
-Description: infrastructurez for a twitter bot
+Description: infrastructurez for the twitter bot
 
 Parameters:
   TwitterConsumerKey:
@@ -70,10 +70,30 @@ Resources:
           Arn: !GetAtt GitWishesLambdaBot.Arn
           Id: "CommitSearchEventScheduler"
 
-  PermissionForCommitSearchEventToInvokeLambda:
+  TweetEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      ScheduleExpression: "rate(4 hours)"
+      Name: TweetEvent
+      State: "ENABLED"
+      Targets:
+        -
+          Arn: !GetAtt GitWishesLambdaBot.Arn
+          Id: "TweetEventScheduler"
+
+  CommitSearchEventLambdaPermissions:
     Type: "AWS::Lambda::Permission"
     Properties:
       FunctionName: !Ref LambdaFunctionName
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
       SourceArn: !GetAtt [CommitSearchEventRule, Arn]
+
+  TweetEventLambdaPermissions:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      FunctionName: !Ref LambdaFunctionName
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt [TweetEventRule, Arn]
+
