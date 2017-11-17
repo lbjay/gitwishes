@@ -1,8 +1,9 @@
 
+import shutil
 from invoke import task
 from os import getenv as env
 from dotenv import load_dotenv
-from os.path import join, dirname
+from os.path import join, dirname, exists
 
 load_dotenv(join(dirname(__file__), '.env'))
 
@@ -25,7 +26,7 @@ def package(ctx):
     if AWS_PROFILE is not None:
         profile = "--profile {}".format(AWS_PROFILE)
     cmd = ("aws {} cloudformation package --s3-bucket {} "
-           "--template-file template.yml --s3-prefix package "
+           "--template-file template.yml --s3-prefix packages "
            "--output-template-file serverless-output.yml"
           ).format(profile, PACKAGE_BUCKET_NAME)
     ctx.run(cmd)
@@ -58,3 +59,14 @@ def delete(ctx):
         profile = "--profile {}".format(AWS_PROFILE)
     cmd = "aws {} cloudformation delete-stack --stack-name {}".format(profile, STACK_NAME)
     ctx.run(cmd)
+
+@task
+def clean(ctx):
+    profile = ""
+    if AWS_PROFILE is not None:
+        profile = "--profile {}".format(AWS_PROFILE)
+    cmd = "aws {} s3 rm --recursive s3://{}/packages".format(profile, PACKAGE_BUCKET_NAME)
+    ctx.run(cmd)
+    build_path = join(dirname(__file__), 'dist')
+    if exists(build_path):
+        shutil.rmtree(build_path)
