@@ -1,30 +1,41 @@
+import time
 import boto3
-import requests
 import tweepy
+import requests
+from decimal import Decimal
 from os import getenv as env
+from wordfilter import Wordfilter as BadWordFilter
 from datetime import datetime, timedelta
+from boto3.dynamodb.conditions import Attr
 
+# six "OR"s is the limit for a single commit search query
+# but it gets noisy if you start adding "i hope" or "i want" so whatevs
 queries = [
     "i wish",
     "i really wish",
     "i just wish",
-    "i seriously wish"
+    "i seriously wish",
+    "i just hope",
+    "i really hope"
 ]
 
 TWITTER_CONSUMER_KEY = env('TWITTER_CONSUMER_KEY')
 TWITTER_CONSUMER_SECRET = env('TWITTER_CONSUMER_SECRET')
 TWITTER_ACCESS_TOKEN = env('TWITTER_ACCESS_TOKEN')
 TWITTER_ACCESS_TOKEN_SECRET = env('TWITTER_ACCESS_TOKEN_SECRET')
-QUEUE_NAME = env('QUEUE_NAME')
+DB_TABLE_NAME = env('DB_TABLE_NAME')
 
-sqs = boto3.resource('sqs')
-queue = sqs.get_queue_by_name(QueueName=QUEUE_NAME)
+dynamo = boto3.resource('dynamodb')
+db_table = dynamo.Table(DB_TABLE_NAME)
+
 
 def handler(event, context):
 
     if "TriggerRule" in event:
+        # for testing
         trigger_rule = event["TriggerRule"]
     else:
+        # the arn of the event trigger
         trigger_rule = event['resources'][0].split('/')[-1]
 
     if trigger_rule == 'CommitSearch':
@@ -47,21 +58,37 @@ def handler(event, context):
             return
         print("found {} messages".format(results['total_count']))
 
-        messages = [x['commit']['message'] for x in results['items']]
+        bwf = BadWordFilter()
 
-        for m in messages:
-            queue.send_message(MessageBody=m, MessageGroupId=yesterday)
+        with db_table.batch_writer(overwrite_by_pkeys=['MessageBody']) as batch:
+            for item in results['items']:
+                msg = item['commit']['message']
+                author = item.get('author', {}).get('login', '-')
+                html_url = item['html_url']
+                score = item['score']
+                if bwf.blacklisted(msg):
+                    continue
+                if score < 1:
+                    continue
+                batch.put_item(Item={
+                    'MessageBody': msg,
+                    'Author': author,
+                    'HtmlUrl': html_url,
+                    'Score': Decimal(str(score)),
+                    # expire them after a day
+                    'TTL': int(time.time() + 86400)
+                })
 
     elif trigger_rule == 'Tweet':
 
-        while True:
-            try:
-                msg = queue.receive_messages()[0]
-                msg.delete() # deletes from the queue
-                tweet(msg.body)
-                break
-            except IndexError:
-                pass
+        # setting a TTL doesn't automatically delete expired items :(
+        scan = db_table.scan(FilterExpression=Attr('TTL').gte(int(time.time())))
+        if scan['Count'] == 0:
+            return
+        item = sorted(scan['Items'], key=lambda x: float(x['Score']), reverse=True)[0]
+        db_table.delete_item(Key={'MessageBody': item['MessageBody']})
+        tweet(item['MessageBody'])
+
 
 
 def tweet(message):

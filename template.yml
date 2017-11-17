@@ -14,6 +14,9 @@ Parameters:
   LambdaFunctionName:
     Type: String
     Default: gitwishes-function
+  DynamoDBTableName:
+    Type: String
+    Default: gitwishes-messages
 
 Resources:
 
@@ -21,7 +24,7 @@ Resources:
     Type: AWS::Serverless::Function
     DependsOn:
       - GitWishesRole
-      - GitWishesQueue
+      - GitWishesDB
     Properties:
       Handler: function.handler
       Runtime: python3.6
@@ -34,7 +37,7 @@ Resources:
           TWITTER_CONSUMER_SECRET: !Ref TwitterConsumerSecret
           TWITTER_ACCESS_TOKEN: !Ref TwitterAccessToken
           TWITTER_ACCESS_TOKEN_SECRET: !Ref TwitterAccessTokenSecret
-          QUEUE_NAME: !GetAtt GitWishesQueue.QueueName
+          DB_TABLE_NAME: !Ref DynamoDBTableName
 
   GitWishesRole:
     Type: AWS::IAM::Role
@@ -49,20 +52,29 @@ Resources:
             Service: lambda.amazonaws.com
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AWSLambdaExecute
-        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
 
-  GitWishesQueue:
-    Type: AWS::SQS::Queue
+  GitWishesDB:
+    Type: AWS::DynamoDB::Table
     Properties:
-      ContentBasedDeduplication: true
-      FifoQueue: true
-      MessageRetentionPeriod: 86400
-      QueueName: gitwishes-messages.fifo
+      TableName: !Ref DynamoDBTableName
+      KeySchema:
+        - AttributeName: MessageBody
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: MessageBody
+          AttributeType: S
+      ProvisionedThroughput:
+        ReadCapacityUnits: "1"
+        WriteCapacityUnits: "1"
+      TimeToLiveSpecification:
+        AttributeName: TTL
+        Enabled: true
 
   CommitSearchEventRule:
     Type: "AWS::Events::Rule"
     Properties:
-      ScheduleExpression: "cron(0 0 * * ? *)"
+      ScheduleExpression: "cron(0 1 * * ? *)"
       Name: CommitSearchEvent
       State: "ENABLED"
       Targets:

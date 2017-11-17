@@ -2,3 +2,4 @@ requests
 tweepy
 awscli
 boto3
+wordfilter

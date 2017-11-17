@@ -1,3 +1,4 @@
 dist/
 serverless-output.yml
+__pycache__/
 
