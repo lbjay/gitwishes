@@ -1,7 +1,6 @@
 import boto3
 import requests
 import tweepy
-import logging
 from os import getenv as env
 from datetime import datetime, timedelta
 
@@ -46,6 +45,8 @@ def handler(event, context):
 
         if results['total_count'] == 0:
             return
+        print("found {} messages".format(results['total_count']))
+
         messages = [x['commit']['message'] for x in results['items']]
 
         for m in messages:
@@ -55,7 +56,7 @@ def handler(event, context):
 
         while True:
             try:
-c               msg = queue.receive_messages()[0]
+                msg = queue.receive_messages()[0]
                 msg.delete() # deletes from the queue
                 tweet(msg.body)
                 break
@@ -63,11 +64,10 @@ c               msg = queue.receive_messages()[0]
                 pass
 
 
-
 def tweet(message):
     auth = tweepy.OAuthHandler(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET)
     auth.secure = True
     auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
     api = tweepy.API(auth)
-    api.update(status=message)
+    api.update_status(message)
 
