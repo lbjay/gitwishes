@@ -7,9 +7,10 @@ from os.path import join, dirname, exists
 
 load_dotenv(join(dirname(__file__), '.env'))
 
-STACK_NAME=env('STACK_NAME', 'gitwishes')
-PACKAGE_BUCKET_NAME=env('PACKAGE_BUCKET_NAME')
-AWS_PROFILE=env('AWS_PROFILE')
+STACK_NAME = env('STACK_NAME', 'gitwishes')
+PACKAGE_BUCKET_NAME = env('PACKAGE_BUCKET_NAME')
+AWS_PROFILE = env('AWS_PROFILE')
+
 
 @task
 def build_deps(ctx):
@@ -20,6 +21,7 @@ def build_deps(ctx):
     ctx.run(cmd)
     ctx.run("ln -s -r -t {} {}".format(build_path, function_path))
 
+
 @task
 def package(ctx):
     profile = ""
@@ -28,8 +30,9 @@ def package(ctx):
     cmd = ("aws {} cloudformation package --s3-bucket {} "
            "--template-file template.yml --s3-prefix packages "
            "--output-template-file serverless-output.yml"
-          ).format(profile, PACKAGE_BUCKET_NAME)
+           ).format(profile, PACKAGE_BUCKET_NAME)
     ctx.run(cmd)
+
 
 @task
 def deploy(ctx):
@@ -43,29 +46,36 @@ def deploy(ctx):
         'TwitterAccessToken': env('TWITTER_ACCESS_TOKEN'),
         'TwitterAccessTokenSecret': env('TWITTER_ACCESS_TOKEN_SECRET'),
     }
-    param_overrides = " ".join(["{}={}".format(k,v) for k,v in template_params.items()])
+    param_overrides = " ".join(
+        ["{}={}".format(k, v) for k, v in template_params.items()]
+    )
 
-    cmd = ("aws {} cloudformation deploy --template-file serverless-output.yml "
+    cmd = ("aws {} cloudformation deploy "
+           "--template-file serverless-output.yml "
            "--capabilities CAPABILITY_NAMED_IAM --stack-name {} "
            "--parameter-overrides {}"
            ).format(profile, STACK_NAME, param_overrides)
 
     ctx.run(cmd)
 
+
 @task
 def delete(ctx):
     profile = ""
     if AWS_PROFILE is not None:
         profile = "--profile {}".format(AWS_PROFILE)
-    cmd = "aws {} cloudformation delete-stack --stack-name {}".format(profile, STACK_NAME)
+    cmd = ("aws {} cloudformation delete-stack "
+           "--stack-name {}").format(profile, STACK_NAME)
     ctx.run(cmd)
+
 
 @task
 def clean(ctx):
     profile = ""
     if AWS_PROFILE is not None:
         profile = "--profile {}".format(AWS_PROFILE)
-    cmd = "aws {} s3 rm --recursive s3://{}/packages".format(profile, PACKAGE_BUCKET_NAME)
+    cmd = ("aws {} s3 rm --recursive "
+           "s3://{}/packages").format(profile, PACKAGE_BUCKET_NAME)
     ctx.run(cmd)
     build_path = join(dirname(__file__), 'dist')
     if exists(build_path):

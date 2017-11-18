@@ -74,7 +74,7 @@ Resources:
   CommitSearchEventRule:
     Type: "AWS::Events::Rule"
     Properties:
-      ScheduleExpression: "cron(0 1 * * ? *)"
+      ScheduleExpression: "cron(0 6 * * ? *)"
       Name: CommitSearchEvent
       State: "ENABLED"
       Targets:
