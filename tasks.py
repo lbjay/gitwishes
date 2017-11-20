@@ -45,6 +45,7 @@ def deploy(ctx):
         'TwitterConsumerSecret': env('TWITTER_CONSUMER_SECRET'),
         'TwitterAccessToken': env('TWITTER_ACCESS_TOKEN'),
         'TwitterAccessTokenSecret': env('TWITTER_ACCESS_TOKEN_SECRET'),
+        'ExcludeRepos': env('EXCLUDE_REPOS')
     }
     param_overrides = " ".join(
         ["{}={}".format(k, v) for k, v in template_params.items()]

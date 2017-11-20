@@ -17,6 +17,9 @@ Parameters:
   DynamoDBTableName:
     Type: String
     Default: gitwishes-messages
+  ExcludeRepos:
+    Type: String
+    Default: ""
 
 Resources:
 
@@ -38,6 +41,7 @@ Resources:
           TWITTER_ACCESS_TOKEN: !Ref TwitterAccessToken
           TWITTER_ACCESS_TOKEN_SECRET: !Ref TwitterAccessTokenSecret
           DB_TABLE_NAME: !Ref DynamoDBTableName
+          EXCLUDE_REPOS: !Ref ExcludeRepos
 
   GitWishesRole:
     Type: AWS::IAM::Role
