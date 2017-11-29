@@ -72,7 +72,12 @@ def handler(event, context):
             for item in results['items']:
 
                 msg = item['commit']['message']
-                author = item.get('author', {}).get('login', '-')
+
+                try:
+                    author = item['author']['login']
+                except:
+                    author = None
+
                 html_url = item['html_url']
                 score = item['score']
                 repo = item.get('repository', {}).get('name')
@@ -115,7 +120,8 @@ def handler(event, context):
     elif trigger_rule == 'TweetEvent':
 
         # setting a TTL doesn't automatically delete expired items :(
-        scan = table.scan(FilterExpression=Attr('TTL').gte(int(time.time())))
+        exp = Attr('TTL').gt(int(time.time())) & Attr('Tweeted').not_exists()
+        scan = table.scan(FilterExpression=exp)
         print("found {} items".format(scan['Count']))
 
         if scan['Count'] == 0:
@@ -131,7 +137,13 @@ def handler(event, context):
             print("tweeting '{}'".format(item['MessageBody']))
             tweet(item['MessageBody'])
         finally:
-            table.delete_item(Key={'MessageBody': item['MessageBody']})
+            # mark item as used
+            table.update_item(
+                Key={'MessageBody': item['MessageBody']},
+                AttributeUpdates={
+                    'Tweeted': {'Value': int(time.time()), 'Action': 'PUT'}
+                }
+            )
 
 
 def tweet(message):
