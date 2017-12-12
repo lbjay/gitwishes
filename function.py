@@ -50,7 +50,7 @@ def handler(event, context):
             datetime.now() - timedelta(1),
             '%Y-%m-%d'
         )
-        q = '("{}") committer-date:>={}'.format(
+        q = '("{}") committer-date:{}'.format(
             '" OR "'.join(queries),
             yesterday
         )
@@ -112,7 +112,7 @@ def handler(event, context):
                     'Author': author,
                     'HtmlUrl': html_url,
                     'Score': Decimal(str(score)),
-                    'TTL': int(time.time() + 86400)  # expire them after a day
+                    'TTL': int(time.time() + (7 * 86400))  # expire them after a week
                 })
 
                 print("added: '{}', {}".format(msg, html_url))
